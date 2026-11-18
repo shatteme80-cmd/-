@@ -1,0 +1,60 @@
+name: Build Installable APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Prepare debug keystore and env
+        run: |
+          if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          touch .env
+
+      - name: Build Debug APK
+        run: gradle :app:assembleDebug
+
+      - name: Rename APK for direct download
+        run: cp app/build/outputs/apk/debug/app-debug.apk RiaziCraft-v3.0.apk
+
+      - name: Publish Direct APK Release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v3.0-run-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" RiaziCraft-v3.0.apk \
+            --title "RiaziCraft v3.0" \
+            --notes "فایل APK قابل نصب برنامه ریاضیکرفت (نسخه ۳.۰)"
+
+      - name: Upload Installable APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RiaziCraft-APK
+          path: RiaziCraft-v3.0.apk
+          if-no-files-found: error
